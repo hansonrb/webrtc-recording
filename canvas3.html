@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Video Call - PC 1</title>
+		<style>
+		body {
+			background: black;
+		}
+		#localCanvas {
+			position: absolute;
+			top: 240px;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			width: 400px;
+			height: 180px;
+			/*width: 100%;
+			height: 100%;*/
+		}
+		#localVideo {
+			position: absolute;
+			top: 0%;
+			left: 0%;
+			/*width: 426px;
+			height: 240px;*/
+			width: 320px;
+			height: 240px;
+			box-shadow: 1px 1px 10px 0 rgba(0,0,0,0.3);
+		}
+		#localCamera {
+			position: absolute;
+			top: 0%;
+			right: 0%;
+			width: 320px;
+			height: 240px;
+			box-shadow: 1px 1px 10px 0 rgba(0,0,0,0.3);
+		}
+
+		#recordPreview {
+			position: absolute;
+			top: 300px;
+			right: 0%;
+
+			transform: translateX(-50%);
+			box-shadow: 1px 1px 10px 0 rgba(0,0,0,0.3);
+		}
+		.buttons {
+			position: absolute;
+			top: 100px;
+			left: 50%;
+			transform: translateX(-50%);
+		}
+		button {
+			padding: 10px 30px;
+			background-color: #eeeeee;
+		}
+		</style>
+	</head>
+	<body>
+		<canvas id="localCanvas"></canvas>
+		<video id="localVideo" controls loop autoplay="1">
+			<source src="./chrome.webm" type="video/webm">
+			<source src="./chrome.mp4" type="video/mp4">
+		</video>
+
+	<video id="localCamera" autoplay muted></video>
+
+	<video id="recordPreview" autoplay muted></video>
+
+	<div class="buttons">
+		<button id="record">Record</button>
+		<button id="download">Download</button>
+	</div>
+
+	<script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+	<script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
+
+	<script type="text/javascript">
+	var captureStream;
+	var recordedBlobs;
+	var localStream;
+	var videoStream;
+
+	document.addEventListener('DOMContentLoaded', function() {
+		var localVideo = document.getElementById('localVideo');
+		var localCamera = document.getElementById('localCamera');
+	}, false);
+
+	function gotStream(stream) {
+		localCamera.srcObject = stream;
+		localStream = stream;
+		videoStream = localVideo.captureStream()
+	}
+	navigator.mediaDevices.getUserMedia({
+		audio: false,
+		video: true
+	})
+	.then(gotStream)
+	.catch(function(e) {
+		alert('getUserMedia() error: ' + e.name);
+	});
+
+	var recordButton = document.querySelector('button#record');
+	var downloadButton = document.querySelector('button#download');
+	recordButton.onclick = toggleRecording;
+	downloadButton.onclick = download;
+
+	function toggleRecording() {
+		if (recordButton.textContent === 'Record') {
+			console.log('start recording');
+			startRecording();
+		} else {
+			console.log('stop recording');
+			stopRecording();
+			recordButton.textContent = 'Record';
+			downloadButton.disabled = false;
+		}
+	}
+
+	var recordRTC;
+	function startRecording() {
+		var arrayOfStreams = [videoStream, localStream];
+		recordRTC = RecordRTC(arrayOfStreams, {
+			type: 'video',
+			mimeType: 'video/webm', // or video/webm\;codecs=h264 or video/webm\;codecs=vp9
+			previewStream: function(stream) {
+				document.getElementById('recordPreview').srcObject = stream;
+			}
+		});
+		recordRTC.startRecording();
+
+		downloadButton.disabled = true;
+		recordButton.textContent = 'Stop';
+	}
+
+	function stopRecording() {
+		recordRTC.stopRecording(function(singleWebM) {
+			// recordedBlobs = recordRTC.getBlob();
+			recordRTC.getDataURL(function(dataURL) {
+				recordedBlobs = dataURL
+			});
+		});
+	}
+
+	function download() {
+		recordRTC.save('myfile');
+	}
+	</script>
+</body>
+</html>

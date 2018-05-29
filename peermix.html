@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Cyclops-Comms Demo</title>
+    </head>
+    <body>
+        <canvas id="tempDerivedStreamCanvas" style="position: absolute; top: -10000px; margin-top -10000px;"></canvas>
+        <h1 id="title">Start a room</h1>
+        <style>
+            .videoContainer {
+                position: relative;
+                width: 200px;
+                height: 150px;
+            }
+            .videoContainer video {
+                position: absolute;
+                width: 100%;
+                height: 100%;
+            }
+            .volume_bar {
+                position: absolute;
+                width: 5px;
+                height: 0px;
+                right: 0px;
+                bottom: 0px;
+                background-color: #12acef;
+            }
+        </style>
+        <button id="screenShareButton">Share Screen</button>
+        <p id="subTitle"></p>
+        <form id="createRoom">
+            <input id="sessionInput"/>
+            <button type="submit">Create it!</button>
+        </form>
+        <div class="videoContainer">
+            <video id="localVideo" style="height: 150px;" oncontextmenu="return false;"></video>
+            <div id="localVolume" class="volume_bar"></div>
+        </div>
+        <div id="remotes"></div>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+        <!-- <script src="../dist/cyclops-comms.js"></script> -->
+        <script>
+            // grab the room from the URL
+            var room = location.search && location.search.split('?')[1];
+
+            // var cyclopsCommsConfig = {};
+            // cyclopsCommsConfig.tempDerivedStreamCanvas =
+            //     cyclopsCommsConfig.tempDerivedStreamCanvas || "tempDerivedStreamCanvas";
+            // cyclopsCommsConfig.debug = false;
+            // window.cyclopsCommsEngine = new window.cyclopsComms.cyclopsComms(cyclopsCommsConfig);
+
+            console.log('room:', room);
+            if(room) startRoom(room);
+            function startRoom(room) {
+                const settings = {
+                  roomName: room,
+                  debug: false,
+                  url: 'https://sandbox.simplewebrtc.com:443/',
+                  localMedia: {
+                    //getMicId: getStoredMicId, // optional
+                    //getCamId: getStoredCamId, // optional
+                  },
+                  fetchTurnServers: null,
+                  socketio: {},
+                };
+                urlAddressOverrides(settings);
+                // window.cyclopsCommsEngine.startMediaAndConnectToRoom(settings);
+            }
+
+            function showVolume(el, volume) {
+                if (!el) return;
+                if (volume < -45) { // vary between -45 and -20
+                    el.style.height = '0px';
+                } else if (volume > -20) {
+                    el.style.height = '100%';
+                } else {
+                    el.style.height = '' + Math.floor((volume + 100) * 100 / 25 - 220) + '%';
+                }
+            }
+            // webrtc.on('channelMessage', function (peer, label, data) {
+            //     if (data.type == 'volume') {
+            //         showVolume(document.getElementById('volume_' + peer.id), data.volume);
+            //     }
+            // });
+            // cyclopsCommsEngine.onStreamRemoved(gui_videoTileEvent_removeStream);
+            // cyclopsCommsEngine.onStreamAdded(gui_videoTileEvent_addStream);
+
+           function gui_videoTileEvent_addStream(occupant) {
+                console.log('media added', occupant);
+                var remotes = document.getElementById('remotes');
+                if (remotes) {
+                    if(occupant.getStream().getVideoTracks().length > 0) {
+                        var d = document.createElement('div');
+                        d.className = 'videoContainer';
+                        d.id = 'container_' + occupant.getId();
+                        var video = document.createElement("video");
+                        video.srcObject = occupant.getStream();
+                        video.autoplay = true;
+                        video.muted = true;
+                        d.appendChild(video);
+                        var vol = document.createElement('div');
+                        vol.id = 'volume_' + occupant.getId();
+                        vol.className = 'volume_bar';
+                        video.onclick = function () {
+                            video.style.width = video.videoWidth + 'px';
+                            video.style.height = video.videoHeight + 'px';
+                        };
+                        d.appendChild(vol);
+                        remotes.appendChild(d);
+                    }
+                    if(occupant.getStream().getAudioTracks().length > 0 && !occupant.isLocal()) {
+                        var audio = document.createElement("audio");
+                        audio.src.Object = occupant.getStream();
+                        audio.autoplay = true;
+                        audio.id = "audio_" + occupant.getId();
+                        remotes.appendChild(audio);
+                    }
+                }
+            }
+           function gui_videoTileEvent_removeStream(occupant) {
+                console.log('video removed ', occupant);
+                var remotes = document.getElementById('remotes');
+                if (!remotes) return;
+                var el = document.getElementById('container_' + occupant.getId());
+                var audioEl = document.getElementByID('audio_' + occupant.getId());
+                if (el) {
+                    remotes.removeChild(el);
+                }
+                if (audioEl) {
+                    remotes.removeChild(audioEl);
+                }
+            }
+            // webrtc.on('volumeChange', function (volume, treshold) {
+            //     //console.log('own volume', volume);
+            //     showVolume(document.getElementById('localVolume'), volume);
+            // });
+
+            // Since we use this twice we put it here
+            function setRoom(name) {
+                $('form').remove();
+                $('h1').text(name);
+                $('#subTitle').text('Link to join: ' + location.href);
+                $('body').addClass('active');
+            }
+
+            if (room) {
+                setRoom(room);
+            } else {
+                $('form').submit(function () {
+                    var val = $('#sessionInput').val().toLowerCase().replace(/\s/g, '-').replace(/[^A-Za-z0-9_\-]/g, '');
+                        console.log(' create room cb', arguments);
+
+                        var newUrl = location.pathname + '?' + val;
+                            history.replaceState({foo: 'bar'}, null, newUrl);
+                            setRoom(val);
+                            startRoom(val);
+                    });
+            }
+
+            setButton = () => null;
+            var button = $('#screenShareButton'),
+                setButton = function (bool) {
+                    button.text(bool ? 'share screen' : 'stop sharing');
+                };
+            // window.cyclopsCommsEngine.onScreenShareRemoved( (screenShareSource) => {
+                // if (screenShareSource.isLocal()) setButton(true);
+            // });
+
+            setButton(true);
+
+            button.click(function () {
+                if (cyclopsCommsEngine.isSharingLocalScreen()) {
+                    cyclopsCommsEngine.stopLocalScreenShare();
+                    setButton(true);
+                } else {
+                    cyclopsCommsEngine.startLocalScreenShare()
+                    .then(function (err) {
+                        if (err) {
+                            console.error(err);
+                            setButton(true);
+                        } else {
+                            setButton(false);
+                        }
+                    });
+
+                }
+            });
+
+           // over-rides from the url line. This is really for debugging
+            function urlAddressOverrides(settings) {
+              settings.localMedia = settings.localMedia || {};
+              const lm = settings.localMedia;
+              let width = window.location.search.toLowerCase().indexOf("width=");
+              let height = window.location.search.toLowerCase().indexOf("height=");
+              let framerate = window.location.search.toLowerCase().indexOf("framerate=");
+              let replace = window.location.search.toLowerCase().indexOf("process=") > 0;
+              if (width > 0) {
+                lm.cameraWidth = parseInt(window.location.search.substring(width + 6));
+              }
+              if (height > 0) {
+                lm.cameraHeight = parseInt(window.location.search.substring(height + 7));
+              }
+              if (framerate > 0) {
+                lm.idealFrameRate = parseInt(window.location.search.substring(framerate + 10));
+              }
+              if (replace > 0) {
+                lm.preprocessStream = parseInt(window.location.search.substring(replace + 8));
+              }
+
+              var adapt = window.location.search.toLowerCase().indexOf("adapt=true") > 0;
+              var bandwidth = window.location.search.toLowerCase().indexOf("bandw=");
+              if (bandwidth > 0) {
+                settings.restrictBandwidth = parseInt(window.location.search.substring(bandwidth + 6));
+              }
+              if (adapt) {
+                settings.adaptiveParameters = adapt;
+              }
+            }
+        </script>
+    </body>
+</html>

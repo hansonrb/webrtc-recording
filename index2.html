@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Video Call - PC 2</title>
+  </head>
+  <body>
+    <h1>Receiver</h1>
+
+	<textarea id="candidate"></textarea>
+    <button id="receiveButton">Receive</button>
+
+    <div class="participants">
+      <video id="remoteVideo" autoplay></video>
+    </div>
+
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+<script type="text/javascript">
+  var remoteVideo = document.getElementById('localVideo');
+  var receiveButton = document.getElementById('callButton');
+  receiveButton.onclick = receive;
+
+  var localStream;
+
+  function gotStream(stream) {
+    localVideo.srcObject = stream;
+    localStream = stream;
+  }
+
+  navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: true
+  })
+  .then(gotStream)
+  .catch(function(e) {
+    alert('getUserMedia() error: ' + e.name);
+  });
+
+  function call() {
+    var videoTracks = localStream.getVideoTracks();
+    var audioTracks = localStream.getAudioTracks();
+    if (videoTracks.length > 0) {
+      console.log('Using video device: ' + videoTracks[0].label);
+    }
+    if (audioTracks.length > 0) {
+      console.log('Using audio device: ' + audioTracks[0].label);
+    }
+
+    var servers = null;
+    pc1 = new RTCPeerConnection(servers);
+
+    pc1.onicecandidate = function(e) {
+      console.log(e.candidate);
+    };
+
+    pc1.oniceconnectionstatechange = function(e) {
+      console.log(pc.iceConnectionState, event)
+    };
+
+    localStream.getTracks().forEach(
+      function(track) {
+        pc1.addTrack(
+          track,
+          localStream
+        );
+      }
+    );
+
+    pc1.createOffer({
+      offerToReceiveAudio: 1,
+      offerToReceiveVideo: 1
+    }).then(
+      onCreateOfferSuccess,
+      function(error) {
+        console.log('Failed to create session description: ' + error.toString());
+      }
+    );
+  }
+
+  function onCreateOfferSuccess(desc) {
+    console.log(desc, 'createoffsersuccess');
+    pc1.setLocalDescription(desc).then(
+      function() {
+        console.log(pc1, 'setLocalDescription complete');
+      },
+      function(error) {
+        console.log('Failed to set session description: ' + error.toString());
+      }
+    );
+  }
+</script>
+  </body>
+</html>
