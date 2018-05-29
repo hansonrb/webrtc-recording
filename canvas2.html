@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Video Call - PC 1</title>
+        <style>
+
+body {
+    background: black;
+}
+
+#localCanvas {
+    position: absolute;
+    top: 240px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 400px;
+    height: 180px;
+    /*width: 100%;
+    height: 100%;*/
+}
+
+#localVideo {
+    position: absolute;
+    top: 0%;
+    left: 0%;
+    /*width: 426px;
+    height: 240px;*/
+    width: 320px;
+    height: 240px;
+    box-shadow: 1px 1px 10px 0 rgba(0,0,0,0.3);
+}
+
+#localCamera {
+    position: absolute;
+    top: 0%;
+    right: 0%;
+    width: 320px;
+    height: 240px;
+    box-shadow: 1px 1px 10px 0 rgba(0,0,0,0.3);
+}
+
+.buttons {
+    position: absolute;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+button {
+    padding: 10px 30px;
+    background-color: #eeeeee;
+}
+</style>
+  </head>
+  <body>
+    <canvas id="localCanvas"></canvas>
+  	<video id="localVideo" controls loop autoplay="1">
+  	    <source src="./chrome.webm" type="video/webm">
+          <source src="./chrome.mp4" type="video/mp4">
+  	</video>
+    <!-- <video id="localVideo" autoplay muted></video> -->
+    <video id="localCamera" autoplay muted></video>
+
+    <div class="buttons">
+        <button id="record">Record</button>
+        <button id="download">Download</button>
+    </div>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+
+<script type="text/javascript">
+var captureStream;
+var recordedBlobs;
+var localStream;
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var localVideo = document.getElementById('localVideo');
+    var localCamera = document.getElementById('localCamera');
+
+    var localCanvas = document.getElementById('localCanvas');
+    var context = localCanvas.getContext('2d');
+
+    var cw,ch;
+
+    var cw = Math.floor(localCanvas.clientWidth);
+    var ch = Math.floor(localCanvas.clientHeight);
+    localCanvas.width = cw;
+    localCanvas.height = ch;
+
+    // localVideo.addEventListener('play', function(){
+        drawVideo(localVideo, context, cw, ch);
+    // },false);
+
+    // localCamera.addEventListener('play', function(){
+        drawCamera(localCamera, context, cw, ch);
+    // },false);
+},false);
+
+function drawVideo(v, c, w, h) {
+    if (!v.paused && !v.ended) {
+        console.log('first camera drawn');
+        c.drawImage(v, 0, 0, w/2, h);
+    }
+
+    setTimeout(drawVideo, 100, v, c, w, h);
+}
+
+function drawCamera(v, c, w, h) {
+    if (!v.paused && !v.ended) {
+        console.log('second camera drawn');
+        c.drawImage(v, w/2, 0, w/2, h);
+    }
+
+    setTimeout(drawCamera, 250, v, c, w, h);
+}
+
+
+function gotStream(stream) {
+    localCamera.srcObject = stream;
+    localStream = stream;
+}
+
+navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: true
+})
+.then(gotStream)
+.catch(function(e) {
+    alert('getUserMedia() error: ' + e.name);
+});
+
+var recordButton = document.querySelector('button#record');
+var downloadButton = document.querySelector('button#download');
+recordButton.onclick = toggleRecording;
+downloadButton.onclick = download;
+
+function toggleRecording() {
+  if (recordButton.textContent === 'Record') {
+    console.log('start recording');
+    startRecording();
+  } else {
+    console.log('stop recording');
+    stopRecording();
+    recordButton.textContent = 'Record';
+    downloadButton.disabled = false;
+  }
+}
+
+function startRecording() {
+  var options = {mimeType: 'video/webm'};
+  recordedBlobs = [];
+
+  var localCanvas = document.getElementById('localCanvas')
+  captureStream = localCanvas.captureStream();
+
+  try {
+    mediaRecorder = new MediaRecorder(captureStream, options);
+    // mediaRecorder = new MediaRecorder([videoStream, localVideo.captureStream()], options);
+  } catch (e0) {
+    console.log('Unable to create MediaRecorder with options Object: ', e0);
+    try {
+      options = {mimeType: 'video/webm,codecs=vp9'};
+      mediaRecorder = new MediaRecorder(captureStream, options);
+    } catch (e1) {
+      console.log('Unable to create MediaRecorder with options Object: ', e1);
+      try {
+        options = 'video/vp8'; // Chrome 47
+        mediaRecorder = new MediaRecorder(captureStream, options);
+      } catch (e2) {
+        alert('MediaRecorder is not supported by this browser.\n\n' +
+            'Try Firefox 29 or later, or Chrome 47 or later, with Enable experimental Web Platform features enabled from chrome://flags.');
+        console.error('Exception while creating MediaRecorder:', e2);
+        return;
+      }
+    }
+  }
+  console.log('Created MediaRecorder', mediaRecorder, 'with options', options);
+  recordButton.textContent = 'Stop';
+  downloadButton.disabled = true;
+
+  mediaRecorder.onstop = handleStop;
+  mediaRecorder.ondataavailable = handleDataAvailable;
+  mediaRecorder.start(12); // collect 100ms of data
+  console.log('MediaRecorder started', mediaRecorder);
+}
+
+function handleDataAvailable(event) {
+  if (event.data && event.data.size > 0) {
+    recordedBlobs.push(event.data);
+  }
+}
+
+function stopRecording() {
+  mediaRecorder.stop();
+  captureStream = null;
+}
+
+function download() {
+  var blob = new Blob(recordedBlobs, {type: 'video/webm'});
+  var url = window.URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = 'test.webm';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+}
+
+function handleStop(event) {
+  console.log('Recorder stopped: ', event);
+}
+</script>
+  </body>
+</html>
